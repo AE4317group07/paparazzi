@@ -1,0 +1,60 @@
+<!DOCTYPE module SYSTEM "module.dtd">
+
+<module name="all" dir="computer_vision">
+  <doc>
+     <description>Optical flow calculation for obstacle avoidnce and colorfilter option</description>
+  </doc>
+
+  <settings>
+     <dl_settings>
+      <dl_settings NAME="Optical_flow and Colorfilter">
+         <dl_setting var="trb"  	   min="0" step="1" max="5000" shortname="trb" />
+         <dl_setting var="tro"  	   min="0" step="1" max="5000" shortname="tro" />
+         <dl_setting var="color_lum_min_o" min="0" step="1" max="255" shortname="y_min" />
+         <dl_setting var="color_lum_max_o" min="0" step="1" max="255" shortname="y_max" />
+         <dl_setting var="color_cb_min_o"  min="0" step="1" max="255" shortname="u_min" />
+         <dl_setting var="color_cb_max_o"  min="0" step="1" max="255" shortname="u_max" />
+         <dl_setting var="color_cr_min_o"  min="0" step="1" max="255" shortname="v_min" />
+         <dl_setting var="color_cr_max_o"  min="0" step="1" max="255" shortname="v_max" />
+         <dl_setting var="color_lum_min_b" min="0" step="1" max="255" shortname="y_minb" />
+         <dl_setting var="color_lum_max_b" min="0" step="1" max="255" shortname="y_maxb" />
+         <dl_setting var="color_cb_min_b"  min="0" step="1" max="255" shortname="u_minb" />
+         <dl_setting var="color_cb_max_b"  min="0" step="1" max="255" shortname="u_maxb" />
+         <dl_setting var="color_cr_min_b"  min="0" step="1" max="255" shortname="v_minb" />
+         <dl_setting var="color_cr_max_b"  min="0" step="1" max="255" shortname="v_maxb" />    
+      </dl_settings>
+     </dl_settings>
+  </settings>
+
+  <depends>video_thread</depends>
+
+  <header>
+    <file name="all_together_group7.h"/>
+  </header>
+
+  <init fun="all_together_init()"/>
+
+ <makefile>
+    <file name="all_together_group7.c"/>
+  </makefile>
+
+ <makefile target="ap">
+    <!-- Include the needed Computer Vision files -->
+    <define name="modules/computer_vision" type="include"/>
+    <file name="image_group7.c" dir="modules/computer_vision/lib/vision"/>
+    <file name="image.c" dir="modules/computer_vision/lib/vision"/>
+    <file name="jpeg.c" dir="modules/computer_vision/lib/encoding"/>
+    <file name="rtp.c" dir="modules/computer_vision/lib/encoding"/>
+    <file name="v4l2.c" dir="modules/computer_vision/lib/v4l"/>
+
+    <!-- The optical flow module (calculator) -->
+    <file name="optical_flow_calculator_group7.c" dir="modules/computer_vision"/>
+
+    <!-- Main vision calculations -->
+    <file name="fast_rosten.c" dir="modules/computer_vision/lib/vision"/>
+    <file name="lucas_kanade.c" dir="modules/computer_vision/lib/vision"/>
+
+  </makefile>
+ 
+</module>
+

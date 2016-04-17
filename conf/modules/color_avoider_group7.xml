@@ -1,0 +1,16 @@
+<!DOCTYPE module SYSTEM "module.dtd">
+
+<module name="color_avoider_group7">
+  <doc>
+    <description>Example on how to use the colours detected to avoid orange and black obstacles</description>
+  </doc>
+  <header>
+    <file name="color_avoider_group7.h"/>
+  </header>
+  <init fun="color_avoider_init()"/>
+  <periodic fun="color_avoider_periodic()" freq="4"/>
+  <makefile>
+    <file name="color_avoider_group7.c"/>
+  </makefile>
+</module>
+
