@@ -1,0 +1,170 @@
+<!DOCTYPE flight_plan SYSTEM "flight_plan.dtd">
+
+<flight_plan alt="1.2" ground_alt="0" lat0="51.990634" lon0="4.376789" max_dist_from_home="7" name="Avoider attempt N1" security_height="0.4">
+  <header>
+#include "autopilot.h"
+#include "subsystems/ahrs.h"
+#include "subsystems/electrical.h"
+#include "subsystems/datalink/datalink.h"
+</header>
+  
+  <waypoints> 
+    <waypoint name="HOME" x="0.0" y="0.0"/>
+    <waypoint name="CLIMB" x="1.2" y="-0.6"/>
+    <waypoint name="GOAL" x="2.0" y="2.0"/>
+    <waypoint name="STDBY" x="-0.7" y="-0.8"/>
+    <waypoint name="TD" x="0.8" y="-1.7"/>
+    <waypoint lat="51.9906213" lon="4.3768628" name="_CZ1"/>
+    <waypoint lat="51.9905874" lon="4.3767766" name="_CZ2"/>
+    <waypoint lat="51.9906409" lon="4.3767226" name="_CZ3"/>
+    <waypoint lat="51.990667" lon="4.376806" name="_CZ4"/>
+    <waypoint lat="51.9906230" lon="4.3768465" name="OZ1"/>	
+    <waypoint lat="51.9905988" lon="4.3767816" name="OZ2"/>	
+    <waypoint lat="51.9906381" lon="4.3767383" name="OZ3"/>	
+    <waypoint lat="51.9906583" lon="4.3768044" name="OZ4"/>	
+  </waypoints>
+  <sectors>
+    <sector color="red" name="CyberZoo">
+      <corner name="_CZ1"/>
+      <corner name="_CZ2"/>
+      <corner name="_CZ3"/>
+      <corner name="_CZ4"/>
+    </sector>
+    <sector color="#FF9922" name="ObstacleZone">
+      <corner name="OZ1"/>
+      <corner name="OZ2"/>
+      <corner name="OZ3"/>
+      <corner name="OZ4"/>
+    </sector>
+  </sectors>
+  <exceptions>
+    <exception cond="!InsideCyberZoo(GetPosX(), GetPosY())" deroute="Standby"/> <!-- When outside the safe area in the zoo, stay at that spot-->
+    <exception cond="datalink_time > 2"  deroute="Land here"/> <!-- When the datalink (and therefore GPS is lost)-->
+    <!-- Check if battery is empty, then Land Here -->
+    <exception cond="electrical.bat_low && !(nav_block == IndexOfBlock('Land')) && !(nav_block == IndexOfBlock('Flare')) && !(nav_block == IndexOfBlock('Landed'))" deroute="Land"/>
+    <exception cond="electrical.bat_critical && !(nav_block == IndexOfBlock('Land')) && !(nav_block == IndexOfBlock('Flare')) && !(nav_block == IndexOfBlock('Landed'))" deroute="Land here"/>
+  </exceptions>
+
+	<!--Block definitions - Part that remains the same-->
+
+  <blocks>
+    <block name="Wait GPS">
+      <call fun="NavKillThrottle()"/>
+      <while cond="!GpsFixValid()"/>
+    </block>
+    <block name="Geo init">
+      <while cond="LessThan(NavBlockTime(), 2)"/>
+      <call fun="NavSetAltitudeReferenceHere()"/>
+    </block>
+    <block name="Holding point">
+      <call fun="NavKillThrottle()"/>
+      <attitude pitch="0" roll="0" throttle="0" until="FALSE" vmode="throttle"/>
+    </block>
+
+ <block key="r" name="Start Engine">
+      <call fun="NavResurrect()"/>
+      <attitude pitch="0" roll="0" throttle="0" until="FALSE" vmode="throttle"/>
+      <exception cond="block_time > 1.5" deroute="Takeoff"/>  <!-- Takeoff 1.5s after engines starts -->
+    </block>
+    <block key="t" name="Takeoff" strip_button="Takeoff" strip_icon="takeoff.png">
+      <exception cond="stateGetPositionEnu_f()->z > 1.25" deroute="Standby"/>
+      <call fun="NavSetWaypointHere(WP_CLIMB)"/>
+      <stay climb="nav_climb_vspeed" vmode="climb" wp="CLIMB"/>
+    </block>
+    <block key="s" name="Standby" strip_button="Standby" strip_icon="home.png">
+      <call fun="NavSetWaypointHere(WP_STDBY)"/>
+      <stay wp="STDBY"/>
+      <exception cond="block_time > 2" deroute="START"/>
+    </block>
+
+	<!-- Start the chosen navigation aproach -->
+    <block key="g" name="START" strip_button="Go" strip_icon="lookfore.png">
+      <call fun="NavSetWaypointHere(WP_GOAL)"/>                     
+    </block>
+
+    <block name="StayGoal">
+      <go wp="GOAL"/>
+      <exception cond="block_time > 1" deroute="MoveGoalForward"/> <!-- Move the waypoint after 1s waiting-->
+
+      <!-- change heading if it is not safe to go forwards ,  1-obstacle on left side, 2-obstacle in the middle, 3-obstacle on the right side--> 
+      <exception cond="safeToGoForwards == 1" deroute="DodgeRight"/> 
+      <exception cond="safeToGoForwards == 2" deroute="DodgeRight"/>
+      <exception cond="safeToGoForwards == 3" deroute="DodgeLeft"/> 
+      <exception cond="!InsideObstacleZone(GetPosX(),GetPosY())" deroute="PrepareObstacleRun"/> <!--If it is outside the obstacle zone returns inside-->
+    </block>
+
+	<!-- Moves the Goal waypoint 1m forward and evaluates, if it is safe, goes there --> 
+    <block name="MoveGoalForward">
+      <call fun="moveWaypointForwards(WP_GOAL,1.0)"/> 
+      <deroute block="StayGoal"/> 		      
+      <exception cond="safeToGoForwards == 1" deroute="DodgeRight"/>
+      <exception cond="safeToGoForwards == 2" deroute="DodgeRight"/>
+      <exception cond="safeToGoForwards == 3" deroute="DodgeLeft"/>
+
+	<!-- If the waypoint is set after the obstacle zone, moves in again -->
+      <exception cond="!InsideObstacleZone(WaypointX(WP_GOAL),WaypointY(WP_GOAL))" deroute="PrepareObstacleRun"/> 
+      </block>	
+
+
+	<!-- Change heading to the right side and define -->
+	<!-- Goal waypoint 1m forward until it is safe to go-->							  
+    <block name="DodgeRight">
+      <call fun="NavSetWaypointHere(WP_STDBY)"/>
+      <while cond="1">   <!--Stays until it is safe to go-->
+        <call fun="increase_nav_heading(&nav_heading, 250)"/>
+ 	<call fun="moveWaypointForwards(WP_GOAL,1.0)"/>
+        <go wp="STDBY"/>
+      </while>
+      <exception cond="safeToGoForwards == 0" deroute="StayGoal"/><!--When it's safe go to waypoint Goal-->
+    </block>
+
+	<!-- Change heading to the left side and define -->
+	<!-- Goal waypoint 1m forward until it is safe to go-->	
+    <block name="DodgeLeft"><!-- Muda rumo-->
+      <call fun="NavSetWaypointHere(WP_STDBY)"/>
+      <while cond="1">    <!--Stays until it is safe to go-->
+        <call fun="increase_nav_heading(&nav_heading, -250)"/>
+ 	<call fun="moveWaypointForwards(WP_GOAL,1.0)"/>
+        <go wp="STDBY"/>
+      </while>
+      <exception cond="safeToGoForwards == 0" deroute="StayGoal"/><!--When it's safe go to waypoint Goal-->
+    </block>
+
+
+	<!-- When the drone is outside te obstacle zone change heading to the center of arena -->
+    <block name="PrepareObstacleRun">
+      <call fun="NavSetWaypointHere(WP_STDBY)"/>
+      <call fun="nav_set_heading_towards_waypoint(WP_HOME)"/>
+      <stay wp="STDBY"/>
+      <exception cond="block_time > 1" deroute="GetOutOfObstacleZone"/>
+    </block>
+
+	<!-- Goes inside the obstacle zone and start the navigation approach -->
+    <block name="GetOutOfObstacleZone">
+      <call fun="moveWaypointForwards(WP_GOAL,1)"/>
+      <stay wp="GOAL"/>
+      <exception cond="block_time > 1" deroute="START"/>
+    </block>
+
+	<!-- Land modules, just goes to this part with a deroute on the other modules -->
+    <block key="l" name="Land here" strip_button="Land Here" strip_icon="land-right.png">
+      <call fun="NavSetWaypointHere(WP_TD)"/>
+    </block>
+    <block name="Land">
+      <go wp="TD"/>
+    </block>
+
+    <block name="Flare">
+      <exception cond="NavDetectGround()" deroute="Holding point"/>
+      <exception cond="!nav_is_in_flight()" deroute="Landed"/>
+      <exception cond="block_time > 5" deroute="Landed"/>
+      <call fun="NavStartDetectGround()"/>
+      <stay climb="nav_descend_vspeed" vmode="climb" wp="TD"/>
+    </block>
+
+    <block name="Landed">
+      <call fun="NavKillThrottle()"/>
+      <attitude pitch="0" roll="0" throttle="0" until="FALSE" vmode="throttle"/>
+    </block>
+  </blocks>
+</flight_plan>
